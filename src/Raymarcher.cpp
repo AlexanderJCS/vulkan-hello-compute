@@ -37,9 +37,9 @@ Raymarcher::Raymarcher() {
     cmdBuffer = raymarcher::core::CmdBuffer{logicalDevice, commandPool, false, true};
     cmdBuffer.endWaitSubmit(logicalDevice, graphicsQueue);  // since the command buffer automatically begins upon creation, and we don't want that in this specific case
 
-    glm::vec3 pos = glm::vec3(-1.6899, 0.317017, 1.6386);
-    glm::vec3 lookAt = glm::vec3(0, 0.962f, 0);
-    camera = raymarcher::graphics::Camera{renderWindow, glm::radians(25.0f), aspectRatio, pos, glm::normalize(lookAt - pos)};
+    glm::vec3 pos = glm::vec3(0, 0, 5);
+    glm::vec3 lookAt = glm::vec3(0, 0, 0);
+    camera = raymarcher::graphics::Camera{renderWindow, glm::radians(45.0f), aspectRatio, pos, glm::normalize(lookAt - pos)};
 
     computeOutputImage = raymarcher::graphics::Image{
             logicalDevice, physicalDevice, renderWidth, renderHeight, VK_FORMAT_R8G8B8A8_UNORM,
@@ -60,7 +60,7 @@ Raymarcher::Raymarcher() {
                     raymarcher::core::Binding{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT}   // output image
             }
     };
-    computeShader = raymarcher::graphics::Shader(logicalDevice, "shaders/postprocessing/tonemap/tonemapping.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
+    computeShader = raymarcher::graphics::Shader(logicalDevice, "shaders/postprocessing/raymarching/raymarch.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
     computePipeline = vktools::createComputePipeline(logicalDevice, computeDescriptorSet, computeShader, computePushConsts);
 
     rasterDescriptorSet = raymarcher::core::DescriptorSet{
