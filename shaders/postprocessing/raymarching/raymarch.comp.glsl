@@ -116,7 +116,7 @@ vec3 calcLighting(vec3 wo, vec3 p) {
     float spec = pow(max(dot(n, h), 0.0), 64);
     vec3 specular = specularStrength * lightColor * spec;
 
-    float distSquared = length(p - lightPos);
+    float distSquared = dot(p, lightPos);
 
     return (ambient + (diffuse + specular) / distSquared) * objectColor;
 }
