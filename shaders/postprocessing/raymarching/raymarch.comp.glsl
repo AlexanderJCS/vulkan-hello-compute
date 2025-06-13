@@ -109,14 +109,16 @@ vec3 calcLighting(vec3 wo, vec3 p) {
     vec3 ambient = ambientStrength * ambientLightColor;
 
     float diffuseStrength = 0.8;
-    vec3 diffuse = diffuseStrength * lightColor * max(0.0, dot(n, h));
+    vec3 diffuse = diffuseStrength * lightColor * max(0.0, dot(n, wi));
 
     float specularStrength = 0.5;
     vec3 reflectDir = reflect(-wi, n);
-    float spec = pow(max(dot(wo, reflectDir), 0.0), 64);
+    float spec = pow(max(dot(n, h), 0.0), 64);
     vec3 specular = specularStrength * lightColor * spec;
 
-    return (ambient + diffuse + specular) * objectColor;
+    float distSquared = length(p - lightPos);
+
+    return (ambient + (diffuse + specular) / distSquared) * objectColor;
 }
 
 vec3 getColor(Ray ray) {
