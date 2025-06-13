@@ -78,9 +78,10 @@ float DE(vec3 p) {
 }
 
 float sdfWorld(in vec3 p) {
-    float sphere = sdSphere(p, 1);
-
-    return DE(p);
+//    float sphere = sdSphere(p, 1);
+//
+//    return DE(p);
+    return abs(p.y);
 }
 
 vec3 calcNormal(in vec3 p) {
@@ -93,14 +94,29 @@ vec3 calcNormal(in vec3 p) {
     return normalize(vec3(gradientX, gradientY, gradientZ));
 }
 
-vec3 calcLighting(vec3 p) {
+vec3 calcLighting(vec3 wo, vec3 p) {
+    vec3 objectColor = vec3(0.4, 0.8, 0.4);
+
+    vec3 lightPos = vec3(0, 3, 0);
+    vec3 lightColor = vec3(1, 0.4, 0.4);
+
     vec3 n = calcNormal(p);
+    vec3 wi = normalize(lightPos - p);
+    vec3 h = normalize(wi + wo);
 
-    vec3 lightPos = vec3(2, -5, 3);
-    vec3 wi = normalize(p - lightPos);
-    float diffuseIntensity = max(0, dot(n, wi));
+    float ambientStrength = 0.8;
+    vec3 ambientLightColor = vec3(245/255.0);
+    vec3 ambient = ambientStrength * ambientLightColor;
 
-    return vec3(1, 0, 0) * diffuseIntensity;
+    float diffuseStrength = 0.8;
+    vec3 diffuse = diffuseStrength * lightColor * max(0.0, dot(n, h));
+
+    float specularStrength = 0.5;
+    vec3 reflectDir = reflect(-wi, n);
+    float spec = pow(max(dot(wo, reflectDir), 0.0), 64);
+    vec3 specular = specularStrength * lightColor * spec;
+
+    return (ambient + diffuse + specular) * objectColor;
 }
 
 vec3 getColor(Ray ray) {
@@ -114,7 +130,7 @@ vec3 getColor(Ray ray) {
         float d = sdfWorld(pos);
 
         if (d < MIN_HIT_DIST) {
-            return calcLighting(pos);
+            return calcLighting(-ray.direction, pos);
         }
 
         if (distTraveled > MAX_TRACE_DIST) {
@@ -124,7 +140,7 @@ vec3 getColor(Ray ray) {
         distTraveled += d;
     }
 
-    return vec3(0);
+    return vec3(245/255.0);
 }
 
 void main() {
