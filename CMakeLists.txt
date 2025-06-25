@@ -7,13 +7,20 @@ find_package(Vulkan REQUIRED)
 
 include(FetchContent)
 
-# GLFW
 FetchContent_Declare(
         glfw
         GIT_REPOSITORY https://github.com/glfw/glfw.git
         GIT_TAG        3.4
 )
 FetchContent_MakeAvailable(glfw)
+
+include(FetchContent)
+FetchContent_Declare(
+        glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG        0.9.9.8   # or whatever the latest tag is
+)
+FetchContent_MakeAvailable(glm)
 
 FetchContent_Declare(
         stb
@@ -55,6 +62,7 @@ target_link_libraries(raymarcher
         PRIVATE
         Vulkan::Vulkan
         glfw
+        glm
 )
 
 target_include_directories(raymarcher PRIVATE

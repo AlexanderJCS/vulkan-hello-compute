@@ -781,13 +781,22 @@ VkInstance vktools::createInstance() {
         .apiVersion = VK_API_VERSION_1_3
     };
 
+    // 1) Get the platform/GLFW extensions…
     std::vector<const char*> extensions = getRequiredExtensions();
+
+    // 2) Enable portability-enumeration extension
+    extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 
     VkInstanceCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pApplicationInfo = &appInfo,
+        // 3) Tell Vulkan to enumerate portability drivers
+        .flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR,
         .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
-        .ppEnabledExtensionNames = extensions.data()
+        .ppEnabledExtensionNames = extensions.data(),
+        .enabledLayerCount = 0,
+        .ppEnabledLayerNames = nullptr,
+        .pNext = nullptr
     };
 
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
@@ -799,13 +808,14 @@ VkInstance vktools::createInstance() {
         populateDebugMessengerCreateInfo(debugCreateInfo);
 
         std::array<VkValidationFeatureEnableEXT, 1> enabledFeatures = {
-                VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT
+            VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT
         };
         validationFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
-        validationFeatures.enabledValidationFeatureCount = enabledFeatures.size();
+        validationFeatures.enabledValidationFeatureCount = static_cast<uint32_t>(enabledFeatures.size());
         validationFeatures.pEnabledValidationFeatures = enabledFeatures.data();
 
-        validationFeatures.pNext = debugCreateInfo.pNext;  // in case debugCreateInfo already chains something
+        // Chain validationFeatures → debugCreateInfo → createInfo
+        validationFeatures.pNext = debugCreateInfo.pNext;
         debugCreateInfo.pNext = &validationFeatures;
         createInfo.pNext = &debugCreateInfo;
     }
@@ -817,3 +827,4 @@ VkInstance vktools::createInstance() {
 
     return instance;
 }
+
