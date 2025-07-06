@@ -5,8 +5,13 @@
 
 #include <glm/glm.hpp>
 using glm::mat4;
-
+using glm::vec2;
 #endif
+
+struct Agent {
+    vec2 position;
+    float angle;
+};
 
 struct ComputePushConsts {
     mat4 invView;

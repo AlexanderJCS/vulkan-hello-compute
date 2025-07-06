@@ -51,6 +51,7 @@ private:
     vktools::PipelineInfo rasterPipeline;
     vktools::PipelineInfo renderPipeline;
     vktools::PipelineInfo updatePipeline;
+    raymarcher::core::Buffer agentsBuffer;
 
     VkCommandPool commandPool;
     std::vector<VkImageView> swapchainImageViews;

@@ -111,6 +111,16 @@ Raymarcher::Raymarcher() {
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     };
 
+    std::vector<Agent> defaultAgents;
+    defaultAgents.push_back(Agent{glm::vec2(0, 0), 0});
+
+    agentsBuffer = raymarcher::core::Buffer{
+        logicalDevice, physicalDevice, defaultAgents,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        static_cast<VkMemoryAllocateFlags>(0),
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT  // TODO: make this non-host visible for max perf
+    };
+
     writeDescriptorSets();
 }
 
@@ -165,6 +175,7 @@ void Raymarcher::renderLoop() {
 
 void Raymarcher::writeDescriptorSets() {
     updateDescriptorSet.writeBinding(logicalDevice, 0, computeOutputImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
+    updateDescriptorSet.writeBinding(logicalDevice, 1, agentsBuffer);
     computeDescriptorSet.writeBinding(logicalDevice, 0, computeOutputImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
     rasterDescriptorSet.writeBinding(logicalDevice, 0, computeOutputImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, fragmentImageSampler);
 }
@@ -173,15 +184,20 @@ void Raymarcher::runCompute() {
     const int workgroupWidth = 32;
     const int workgroupHeight = 8;
 
+    const int localSizeX = 256;
+
     computeOutputImage.transition(cmdBuffer.getHandle(), VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
     updateDescriptorSet.bind(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, updatePipeline.pipelineLayout);
+
+    updatePushConsts.getPushConstants().agentCount = static_cast<int>(agentsBuffer.getSize());
+
     updatePushConsts.push(cmdBuffer.getHandle(), updatePipeline.pipelineLayout);
     vkCmdBindPipeline(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, updatePipeline.pipeline);
     vkCmdDispatch(
             cmdBuffer.getHandle(),
-            (renderWidth + workgroupWidth - 1) / workgroupWidth,
-            (renderHeight + workgroupHeight - 1) / workgroupHeight,
+            (agentsBuffer.getSize() + localSizeX - 1) / localSizeX,
+            1,
             1
     );
 
@@ -287,6 +303,7 @@ Raymarcher::~Raymarcher() {
     computeOutputImage.destroy(logicalDevice);
 
     stagingBuffer.destroy(logicalDevice);
+    agentsBuffer.destroy(logicalDevice);
 
     vkDestroySampler(logicalDevice, fragmentImageSampler, nullptr);
     cmdBuffer.destroy(logicalDevice);
