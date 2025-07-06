@@ -54,14 +54,33 @@ Raymarcher::Raymarcher() {
         VK_SHADER_STAGE_COMPUTE_BIT
     };
 
+    updatePushConsts = raymarcher::core::PushConstants{
+            UpdatePushConsts{},
+            VK_SHADER_STAGE_COMPUTE_BIT
+    };
+
+    updateDescriptorSet = raymarcher::core::DescriptorSet{
+            logicalDevice,
+            {
+                    raymarcher::core::Binding{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT},   // image from previous frame
+                    raymarcher::core::Binding{1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT}  // agent positions
+            }
+    };
+
     computeDescriptorSet = raymarcher::core::DescriptorSet{
             logicalDevice,
             {
-                    raymarcher::core::Binding{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT}   // output image
+                    raymarcher::core::Binding{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT},   // output image
+                    raymarcher::core::Binding{1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT}
             }
     };
-    computeShader = raymarcher::graphics::Shader(logicalDevice, "shaders/postprocessing/tonemap/tonemapping.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
-    computePipeline = vktools::createComputePipeline(logicalDevice, computeDescriptorSet, computeShader, computePushConsts);
+    raymarcher::graphics::Shader renderShader{logicalDevice, "shaders/render/rendering.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT};
+    renderPipeline = vktools::createComputePipeline(logicalDevice, computeDescriptorSet, renderShader, computePushConsts);
+    renderShader.destroy(logicalDevice);
+
+    raymarcher::graphics::Shader updateShader{logicalDevice, "shaders/update/update.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT};
+    updatePipeline = vktools::createComputePipeline(logicalDevice, updateDescriptorSet, updateShader, updatePushConsts);
+    updateShader.destroy(logicalDevice);
 
     rasterDescriptorSet = raymarcher::core::DescriptorSet{
             logicalDevice,
@@ -101,15 +120,6 @@ void Raymarcher::renderLoop() {
 
     raymarcher::tools::Clock clock;
     while (!renderWindow.shouldClose()) {
-        // camera
-        camera.processInput(renderWindow, clock.getTimeDelta());
-        if (camera.hasChanged()) {
-            camera.refresh();
-            ComputePushConsts& pushConstantsStruct = computePushConsts.getPushConstants();
-            pushConstantsStruct.invView = camera.getInverseView();
-            pushConstantsStruct.invProj = camera.getInverseProjection();
-        }
-
         // render image
         cmdBuffer.wait(logicalDevice);
         cmdBuffer.begin();
@@ -154,6 +164,7 @@ void Raymarcher::renderLoop() {
 }
 
 void Raymarcher::writeDescriptorSets() {
+    updateDescriptorSet.writeBinding(logicalDevice, 0, computeOutputImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
     computeDescriptorSet.writeBinding(logicalDevice, 0, computeOutputImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
     rasterDescriptorSet.writeBinding(logicalDevice, 0, computeOutputImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, fragmentImageSampler);
 }
@@ -164,10 +175,9 @@ void Raymarcher::runCompute() {
 
     computeOutputImage.transition(cmdBuffer.getHandle(), VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-    computeDescriptorSet.bind(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline.pipelineLayout);
-    computePushConsts.push(cmdBuffer.getHandle(), computePipeline.pipelineLayout);
-
-    vkCmdBindPipeline(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline.pipeline);
+    updateDescriptorSet.bind(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, updatePipeline.pipelineLayout);
+    updatePushConsts.push(cmdBuffer.getHandle(), updatePipeline.pipelineLayout);
+    vkCmdBindPipeline(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, updatePipeline.pipeline);
     vkCmdDispatch(
             cmdBuffer.getHandle(),
             (renderWidth + workgroupWidth - 1) / workgroupWidth,
@@ -183,7 +193,28 @@ void Raymarcher::runCompute() {
             0, nullptr,
             0, nullptr,
             0, nullptr
-            );
+    );
+
+//    computeDescriptorSet.bind(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, renderPipeline.pipelineLayout);
+//    computePushConsts.push(cmdBuffer.getHandle(), renderPipeline.pipelineLayout);
+//
+//    vkCmdBindPipeline(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, renderPipeline.pipeline);
+//    vkCmdDispatch(
+//            cmdBuffer.getHandle(),
+//            (renderWidth + workgroupWidth - 1) / workgroupWidth,
+//            (renderHeight + workgroupHeight - 1) / workgroupHeight,
+//            1
+//    );
+//
+//    vkCmdPipelineBarrier(
+//            cmdBuffer.getHandle(),
+//            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+//            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+//            0,
+//            0, nullptr,
+//            0, nullptr,
+//            0, nullptr
+//            );
 }
 
 void Raymarcher::draw(uint32_t& imageIndex) {
@@ -260,15 +291,17 @@ Raymarcher::~Raymarcher() {
     vkDestroySampler(logicalDevice, fragmentImageSampler, nullptr);
     cmdBuffer.destroy(logicalDevice);
     vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
+    updateDescriptorSet.destroy(logicalDevice);
     computeDescriptorSet.destroy(logicalDevice);
-    computeShader.destroy(logicalDevice);
     rasterDescriptorSet.destroy(logicalDevice);
     vkDestroySemaphore(logicalDevice, syncObjects.renderFinishedSemaphore, nullptr);
     vkDestroySemaphore(logicalDevice, syncObjects.imageAvailableSemaphore, nullptr);
     vkDestroyPipeline(logicalDevice, rasterPipeline.pipeline, nullptr);
-    vkDestroyPipeline(logicalDevice, computePipeline.pipeline, nullptr);
+    vkDestroyPipeline(logicalDevice, renderPipeline.pipeline, nullptr);
+    vkDestroyPipeline(logicalDevice, updatePipeline.pipeline, nullptr);
+    vkDestroyPipelineLayout(logicalDevice, updatePipeline.pipelineLayout, nullptr);
     vkDestroyPipelineLayout(logicalDevice, rasterPipeline.pipelineLayout, nullptr);
-    vkDestroyPipelineLayout(logicalDevice, computePipeline.pipelineLayout, nullptr);
+    vkDestroyPipelineLayout(logicalDevice, renderPipeline.pipelineLayout, nullptr);
 
     vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
 

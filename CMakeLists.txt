@@ -56,7 +56,8 @@ add_executable(raymarcher src/main.cpp
         src/Raymarcher.h
         src/tools/Clock.cpp
         src/tools/Clock.h
-        polyglot/common.h)
+        polyglot/common.h
+        polyglot/update.h)
 
 target_link_libraries(raymarcher
         PRIVATE

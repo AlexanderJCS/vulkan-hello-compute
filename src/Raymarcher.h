@@ -13,6 +13,7 @@
 #include "tools/Clock.h"
 
 #include "../polyglot/common.h"
+#include "../polyglot/update.h"
 
 class Raymarcher {
 public:
@@ -32,6 +33,7 @@ private:
     VkQueue presentQueue;
     std::vector<raymarcher::graphics::Shader> shaders;
     raymarcher::core::PushConstants<ComputePushConsts> computePushConsts;
+    raymarcher::core::PushConstants<UpdatePushConsts> updatePushConsts;
     raymarcher::graphics::Camera camera;
     raymarcher::window::Window renderWindow;
     VkInstance instance;
@@ -41,13 +43,14 @@ private:
     raymarcher::core::Buffer stagingBuffer;
     raymarcher::core::CmdBuffer cmdBuffer;
     raymarcher::core::DescriptorSet computeDescriptorSet;
+    raymarcher::core::DescriptorSet updateDescriptorSet;
     raymarcher::core::DescriptorSet rasterDescriptorSet;
-    raymarcher::graphics::Shader computeShader;
     vktools::SyncObjects syncObjects;
     VkSampler fragmentImageSampler;
     VkRenderPass renderPass;
     vktools::PipelineInfo rasterPipeline;
-    vktools::PipelineInfo computePipeline;
+    vktools::PipelineInfo renderPipeline;
+    vktools::PipelineInfo updatePipeline;
 
     VkCommandPool commandPool;
     std::vector<VkImageView> swapchainImageViews;
