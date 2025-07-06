@@ -41,11 +41,20 @@ Raymarcher::Raymarcher() {
     glm::vec3 lookAt = glm::vec3(0, 0.962f, 0);
     camera = raymarcher::graphics::Camera{renderWindow, glm::radians(25.0f), aspectRatio, pos, glm::normalize(lookAt - pos)};
 
-    computeOutputImage = raymarcher::graphics::Image{
+    pingImage = raymarcher::graphics::Image{
             logicalDevice, physicalDevice, renderWidth, renderHeight, VK_FORMAT_R8G8B8A8_UNORM,
             VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     };
+
+    pongImage = raymarcher::graphics::Image{
+            logicalDevice, physicalDevice, renderWidth, renderHeight, VK_FORMAT_R8G8B8A8_UNORM,
+            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    };
+
+    writeImage = &pingImage;
+    readImage = &pongImage;
 
     fragmentImageSampler = vktools::createSampler(logicalDevice);
 
@@ -63,15 +72,16 @@ Raymarcher::Raymarcher() {
             logicalDevice,
             {
                     raymarcher::core::Binding{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT},   // image from previous frame
-                    raymarcher::core::Binding{1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT}  // agent positions
+                    raymarcher::core::Binding{1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT},   // image from previous frame
+                    raymarcher::core::Binding{2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT}  // agent positions
             }
     };
 
     computeDescriptorSet = raymarcher::core::DescriptorSet{
             logicalDevice,
             {
-                    raymarcher::core::Binding{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT},   // output image
-                    raymarcher::core::Binding{1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT}
+                    raymarcher::core::Binding{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT},
+                    raymarcher::core::Binding{1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT}
             }
     };
     raymarcher::graphics::Shader renderShader{logicalDevice, "shaders/render/rendering.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT};
@@ -137,7 +147,7 @@ void Raymarcher::renderLoop() {
         runCompute();
 
         // render
-        computeOutputImage.transition(cmdBufferHandle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+        readImage->transition(cmdBufferHandle, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
         uint32_t imageIndex = -1;
         if (!renderWindow.isMinimized()) {
@@ -174,10 +184,7 @@ void Raymarcher::renderLoop() {
 }
 
 void Raymarcher::writeDescriptorSets() {
-    updateDescriptorSet.writeBinding(logicalDevice, 0, computeOutputImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
-    updateDescriptorSet.writeBinding(logicalDevice, 1, agentsBuffer);
-    computeDescriptorSet.writeBinding(logicalDevice, 0, computeOutputImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
-    rasterDescriptorSet.writeBinding(logicalDevice, 0, computeOutputImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, fragmentImageSampler);
+    updateDescriptorSet.writeBinding(logicalDevice, 2, agentsBuffer);
 }
 
 void Raymarcher::runCompute() {
@@ -186,9 +193,14 @@ void Raymarcher::runCompute() {
 
     const int localSizeX = 256;
 
-    computeOutputImage.transition(cmdBuffer.getHandle(), VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+    readImage->transition(cmdBuffer.getHandle(), VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+    writeImage->transition(cmdBuffer.getHandle(), VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
+    updateDescriptorSet.writeBinding(logicalDevice, 0, *readImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
+    updateDescriptorSet.writeBinding(logicalDevice, 1, *writeImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
     updateDescriptorSet.bind(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, updatePipeline.pipelineLayout);
+
+    std::swap(writeImage, readImage);
 
     updatePushConsts.getPushConstants().agentCount = static_cast<int>(agentsBuffer.getSize());
 
@@ -211,26 +223,34 @@ void Raymarcher::runCompute() {
             0, nullptr
     );
 
-//    computeDescriptorSet.bind(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, renderPipeline.pipelineLayout);
-//    computePushConsts.push(cmdBuffer.getHandle(), renderPipeline.pipelineLayout);
-//
-//    vkCmdBindPipeline(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, renderPipeline.pipeline);
-//    vkCmdDispatch(
-//            cmdBuffer.getHandle(),
-//            (renderWidth + workgroupWidth - 1) / workgroupWidth,
-//            (renderHeight + workgroupHeight - 1) / workgroupHeight,
-//            1
-//    );
-//
-//    vkCmdPipelineBarrier(
-//            cmdBuffer.getHandle(),
-//            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-//            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-//            0,
-//            0, nullptr,
-//            0, nullptr,
-//            0, nullptr
-//            );
+    readImage->transition(cmdBuffer.getHandle(), VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+    writeImage->transition(cmdBuffer.getHandle(), VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+    computeDescriptorSet.writeBinding(logicalDevice, 0, *readImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
+    computeDescriptorSet.writeBinding(logicalDevice, 1, *writeImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
+
+    computeDescriptorSet.bind(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, renderPipeline.pipelineLayout);
+    computePushConsts.push(cmdBuffer.getHandle(), renderPipeline.pipelineLayout);
+
+    vkCmdBindPipeline(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, renderPipeline.pipeline);
+    vkCmdDispatch(
+            cmdBuffer.getHandle(),
+            (renderWidth + workgroupWidth - 1) / workgroupWidth,
+            (renderHeight + workgroupHeight - 1) / workgroupHeight,
+            1
+    );
+
+    vkCmdPipelineBarrier(
+            cmdBuffer.getHandle(),
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            0,
+            0, nullptr,
+            0, nullptr,
+            0, nullptr
+            );
+
+    std::swap(writeImage, readImage);
 }
 
 void Raymarcher::draw(uint32_t& imageIndex) {
@@ -257,6 +277,8 @@ void Raymarcher::draw(uint32_t& imageIndex) {
     };
 
     vkCmdBeginRenderPass(cmdBuffer.getHandle(), &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    rasterDescriptorSet.writeBinding(logicalDevice,0, *readImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, fragmentImageSampler);
+
     rasterDescriptorSet.bind(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, rasterPipeline.pipelineLayout);
 
     vkCmdBindPipeline(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, rasterPipeline.pipeline);
@@ -300,7 +322,8 @@ Raymarcher::~Raymarcher() {
         vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
     }
 
-    computeOutputImage.destroy(logicalDevice);
+    pingImage.destroy(logicalDevice);
+    pongImage.destroy(logicalDevice);
 
     stagingBuffer.destroy(logicalDevice);
     agentsBuffer.destroy(logicalDevice);

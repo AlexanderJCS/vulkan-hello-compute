@@ -9,9 +9,10 @@ layout (push_constant) uniform PushConsts {
 
 layout (local_size_x = 32, local_size_y = 8, local_size_z = 1) in;
 
-layout(binding = 0, rgba8) writeonly uniform image2D outImage;
+layout(binding = 0, rgba8) readonly uniform image2D readImage;
+layout(binding = 1, rgba8) writeonly uniform image2D writeImage;
 
-layout(std430, binding = 1) buffer AgentBuffer {
+layout(std430, binding = 2) buffer AgentBuffer {
     Agent agents[];
 };
 
@@ -24,12 +25,12 @@ void main() {
 
     Agent a = agents[agent];
     ivec2 pixel = ivec2(a.position);
-    ivec2 imageSize = imageSize(outImage);
+    ivec2 imageSize = imageSize(writeImage);
 
     if (pixel.x < 0 || pixel.x >= imageSize.x || pixel.y < 0 || pixel.y >= imageSize.y) {
         return; // Skip if the pixel is out of bounds
     }
 
     vec4 color = vec4(1, 1, 1, 1);
-    imageStore(outImage, pixel, color);
+    imageStore(writeImage, pixel, color);
 }

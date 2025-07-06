@@ -8,7 +8,8 @@ layout (push_constant) uniform PushConsts {
 
 layout (local_size_x = 32, local_size_y = 8, local_size_z = 1) in;
 
-layout(binding = 0, rgba8) writeonly uniform image2D outImage;
+layout(binding = 0, rgba8) readonly uniform image2D readImage;
+layout(binding = 1, rgba8) writeonly uniform image2D writeImage;
 
 struct Ray {
     vec3 origin;
@@ -49,7 +50,7 @@ Ray getStartingRay(
 void main() {
     // Get the global pixel coordinate for this invocation
     ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
-    ivec2 imageSize = imageSize(outImage);
+    ivec2 imageSize = imageSize(writeImage);
 
     Ray ray = getStartingRay(
         vec2(pixelCoord),
@@ -62,5 +63,5 @@ void main() {
         return;
     }
 
-    imageStore(outImage, pixelCoord, vec4(ray.direction * 0.5 + 0.5, 1));
+    imageStore(writeImage, pixelCoord, vec4(ray.direction * 0.5 + 0.5, 1));
 }

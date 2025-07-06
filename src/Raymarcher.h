@@ -39,7 +39,12 @@ private:
     VkInstance instance;
     VkDevice logicalDevice;
     std::vector<VkFramebuffer> framebuffers;
-    raymarcher::graphics::Image computeOutputImage;
+    raymarcher::graphics::Image pingImage;
+    raymarcher::graphics::Image pongImage;
+
+    raymarcher::graphics::Image* writeImage;
+    raymarcher::graphics::Image* readImage;
+
     raymarcher::core::Buffer stagingBuffer;
     raymarcher::core::CmdBuffer cmdBuffer;
     raymarcher::core::DescriptorSet computeDescriptorSet;
