@@ -6,6 +6,7 @@
 
 struct UpdatePushConsts {
     int agentCount;
+    float deltaTime;
 };
 
 #endif  // RAYMARCHER_UPDATE_H

@@ -58,7 +58,7 @@ Raymarcher::Raymarcher() {
 
     fragmentImageSampler = vktools::createSampler(logicalDevice);
 
-    computePushConsts = raymarcher::core::PushConstants{
+    blurXPushConsts = raymarcher::core::PushConstants{
         ComputePushConsts{camera.getInverseView(), camera.getInverseProjection()},
         VK_SHADER_STAGE_COMPUTE_BIT
     };
@@ -77,16 +77,16 @@ Raymarcher::Raymarcher() {
             }
     };
 
-    computeDescriptorSet = raymarcher::core::DescriptorSet{
+    blurXDescriptorSet = raymarcher::core::DescriptorSet{
             logicalDevice,
             {
                     raymarcher::core::Binding{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT},
                     raymarcher::core::Binding{1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT}
             }
     };
-    raymarcher::graphics::Shader renderShader{logicalDevice, "shaders/render/rendering.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT};
-    renderPipeline = vktools::createComputePipeline(logicalDevice, computeDescriptorSet, renderShader, computePushConsts);
-    renderShader.destroy(logicalDevice);
+    raymarcher::graphics::Shader blurXShader{logicalDevice, "shaders/blur/blurx.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT};
+    blurXPipeline = vktools::createComputePipeline(logicalDevice, blurXDescriptorSet, blurXShader, blurXPushConsts);
+    blurXShader.destroy(logicalDevice);
 
     raymarcher::graphics::Shader updateShader{logicalDevice, "shaders/update/update.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT};
     updatePipeline = vktools::createComputePipeline(logicalDevice, updateDescriptorSet, updateShader, updatePushConsts);
@@ -122,7 +122,7 @@ Raymarcher::Raymarcher() {
     };
 
     std::vector<Agent> defaultAgents;
-    defaultAgents.push_back(Agent{glm::vec2(0, 0), 0});
+    defaultAgents.push_back(Agent{glm::vec2(400, 400), 0});
 
     agentsBuffer = raymarcher::core::Buffer{
         logicalDevice, physicalDevice, defaultAgents,
@@ -140,6 +140,9 @@ void Raymarcher::renderLoop() {
 
     raymarcher::tools::Clock clock;
     while (!renderWindow.shouldClose()) {
+        updatePushConsts.getPushConstants().deltaTime = static_cast<float>(clock.getTimeDelta());
+        blurXPushConsts.getPushConstants().deltaTime = static_cast<float>(clock.getTimeDelta());
+
         // render image
         cmdBuffer.wait(logicalDevice);
         cmdBuffer.begin();
@@ -226,13 +229,13 @@ void Raymarcher::runCompute() {
     readImage->transition(cmdBuffer.getHandle(), VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
     writeImage->transition(cmdBuffer.getHandle(), VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-    computeDescriptorSet.writeBinding(logicalDevice, 0, *readImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
-    computeDescriptorSet.writeBinding(logicalDevice, 1, *writeImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
+    blurXDescriptorSet.writeBinding(logicalDevice, 0, *readImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
+    blurXDescriptorSet.writeBinding(logicalDevice, 1, *writeImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
 
-    computeDescriptorSet.bind(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, renderPipeline.pipelineLayout);
-    computePushConsts.push(cmdBuffer.getHandle(), renderPipeline.pipelineLayout);
+    blurXDescriptorSet.bind(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, blurXPipeline.pipelineLayout);
+    blurXPushConsts.push(cmdBuffer.getHandle(), blurXPipeline.pipelineLayout);
 
-    vkCmdBindPipeline(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, renderPipeline.pipeline);
+    vkCmdBindPipeline(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, blurXPipeline.pipeline);
     vkCmdDispatch(
             cmdBuffer.getHandle(),
             (renderWidth + workgroupWidth - 1) / workgroupWidth,
@@ -332,16 +335,16 @@ Raymarcher::~Raymarcher() {
     cmdBuffer.destroy(logicalDevice);
     vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
     updateDescriptorSet.destroy(logicalDevice);
-    computeDescriptorSet.destroy(logicalDevice);
+    blurXDescriptorSet.destroy(logicalDevice);
     rasterDescriptorSet.destroy(logicalDevice);
     vkDestroySemaphore(logicalDevice, syncObjects.renderFinishedSemaphore, nullptr);
     vkDestroySemaphore(logicalDevice, syncObjects.imageAvailableSemaphore, nullptr);
     vkDestroyPipeline(logicalDevice, rasterPipeline.pipeline, nullptr);
-    vkDestroyPipeline(logicalDevice, renderPipeline.pipeline, nullptr);
+    vkDestroyPipeline(logicalDevice, blurXPipeline.pipeline, nullptr);
     vkDestroyPipeline(logicalDevice, updatePipeline.pipeline, nullptr);
     vkDestroyPipelineLayout(logicalDevice, updatePipeline.pipelineLayout, nullptr);
     vkDestroyPipelineLayout(logicalDevice, rasterPipeline.pipelineLayout, nullptr);
-    vkDestroyPipelineLayout(logicalDevice, renderPipeline.pipelineLayout, nullptr);
+    vkDestroyPipelineLayout(logicalDevice, blurXPipeline.pipelineLayout, nullptr);
 
     vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
 

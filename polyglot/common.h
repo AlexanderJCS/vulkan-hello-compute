@@ -16,6 +16,7 @@ struct Agent {
 struct ComputePushConsts {
     mat4 invView;
     mat4 invProj;
+    float deltaTime;
 };
 
 #endif  // RAYMARCH_TONEMAPPING_H
