@@ -33,6 +33,7 @@ private:
     VkQueue presentQueue;
     std::vector<raymarcher::graphics::Shader> shaders;
     raymarcher::core::PushConstants<ComputePushConsts> blurXPushConsts;
+    raymarcher::core::PushConstants<ComputePushConsts> blurYPushConsts;
     raymarcher::core::PushConstants<UpdatePushConsts> updatePushConsts;
     raymarcher::graphics::Camera camera;
     raymarcher::window::Window renderWindow;
@@ -48,6 +49,7 @@ private:
     raymarcher::core::Buffer stagingBuffer;
     raymarcher::core::CmdBuffer cmdBuffer;
     raymarcher::core::DescriptorSet blurXDescriptorSet;
+    raymarcher::core::DescriptorSet blurYDescriptorSet;
     raymarcher::core::DescriptorSet updateDescriptorSet;
     raymarcher::core::DescriptorSet rasterDescriptorSet;
     vktools::SyncObjects syncObjects;
@@ -55,6 +57,7 @@ private:
     VkRenderPass renderPass;
     vktools::PipelineInfo rasterPipeline;
     vktools::PipelineInfo blurXPipeline;
+    vktools::PipelineInfo blurYPipeline;
     vktools::PipelineInfo updatePipeline;
     raymarcher::core::Buffer agentsBuffer;
 

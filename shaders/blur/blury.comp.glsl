@@ -23,6 +23,6 @@ void main() {
         return;
     }
 
-    vec4 blurred = gaussianBlur1D(pix, size, sigma, ivec2(1, 0));
+    vec4 blurred = gaussianBlur1D(pix, size, sigma, ivec2(0, 1));
     imageStore(writeImage, pix, blurred);
 }
