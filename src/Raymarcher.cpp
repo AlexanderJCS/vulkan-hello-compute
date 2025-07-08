@@ -217,6 +217,7 @@ void Raymarcher::runCompute() {
     writeImage->transition(cmdBuffer.getHandle(), VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
     // Important: read and write to the same image since it doesn't re-write the full image
+    // TODO: this needs to be changed
     updateDescriptorSet.writeBinding(logicalDevice, 0, *readImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
     updateDescriptorSet.writeBinding(logicalDevice, 1, *readImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
     updateDescriptorSet.bind(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, updatePipeline.pipelineLayout);
