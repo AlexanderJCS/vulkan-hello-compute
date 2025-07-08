@@ -220,8 +220,6 @@ void Raymarcher::runCompute() {
     updateDescriptorSet.writeBinding(logicalDevice, 1, *writeImage, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
     updateDescriptorSet.bind(cmdBuffer.getHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, updatePipeline.pipelineLayout);
 
-    std::swap(writeImage, readImage);
-
     updatePushConsts.getPushConstants().agentCount = static_cast<int>(agentsBuffer.getSize());
 
     updatePushConsts.push(cmdBuffer.getHandle(), updatePipeline.pipelineLayout);
@@ -233,6 +231,16 @@ void Raymarcher::runCompute() {
             1
     );
 
+    VkImageMemoryBarrier imgBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    imgBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    imgBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    imgBarrier.oldLayout     = VK_IMAGE_LAYOUT_GENERAL;
+    imgBarrier.newLayout     = VK_IMAGE_LAYOUT_GENERAL;
+    imgBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imgBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imgBarrier.image = writeImage->getImage();
+    imgBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
     vkCmdPipelineBarrier(
             cmdBuffer.getHandle(),
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -240,8 +248,10 @@ void Raymarcher::runCompute() {
             0,
             0, nullptr,
             0, nullptr,
-            0, nullptr
+            1, &imgBarrier
     );
+
+    std::swap(writeImage, readImage);
 
     readImage->transition(cmdBuffer.getHandle(), VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
     writeImage->transition(cmdBuffer.getHandle(), VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
@@ -260,6 +270,16 @@ void Raymarcher::runCompute() {
             1
     );
 
+    imgBarrier = VkImageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    imgBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    imgBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    imgBarrier.oldLayout     = VK_IMAGE_LAYOUT_GENERAL;
+    imgBarrier.newLayout     = VK_IMAGE_LAYOUT_GENERAL;
+    imgBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imgBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imgBarrier.image = writeImage->getImage();
+    imgBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
     vkCmdPipelineBarrier(
             cmdBuffer.getHandle(),
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -267,8 +287,8 @@ void Raymarcher::runCompute() {
             0,
             0, nullptr,
             0, nullptr,
-            0, nullptr
-            );
+            1, &imgBarrier
+    );
 
     std::swap(writeImage, readImage);
 
@@ -289,14 +309,24 @@ void Raymarcher::runCompute() {
             1
     );
 
+    imgBarrier = VkImageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    imgBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    imgBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    imgBarrier.oldLayout     = VK_IMAGE_LAYOUT_GENERAL;
+    imgBarrier.newLayout     = VK_IMAGE_LAYOUT_GENERAL;
+    imgBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imgBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imgBarrier.image = writeImage->getImage();
+    imgBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
     vkCmdPipelineBarrier(
             cmdBuffer.getHandle(),
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             0,
             0, nullptr,
             0, nullptr,
-            0, nullptr
+            1, &imgBarrier
     );
 
     std::swap(writeImage, readImage);
