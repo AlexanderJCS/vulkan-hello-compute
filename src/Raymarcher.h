@@ -35,6 +35,7 @@ private:
     raymarcher::core::PushConstants<ComputePushConsts> blurXPushConsts;
     raymarcher::core::PushConstants<ComputePushConsts> blurYPushConsts;
     raymarcher::core::PushConstants<UpdatePushConsts> updatePushConsts;
+    raymarcher::core::PushConstants<UpdatePushConsts> drawAgentsPushConsts;
     raymarcher::graphics::Camera camera;
     raymarcher::window::Window renderWindow;
     VkInstance instance;
@@ -52,6 +53,7 @@ private:
     raymarcher::core::DescriptorSet blurYDescriptorSet;
     raymarcher::core::DescriptorSet updateDescriptorSet;
     raymarcher::core::DescriptorSet rasterDescriptorSet;
+    raymarcher::core::DescriptorSet drawAgentsDescriptorSet;
     vktools::SyncObjects syncObjects;
     VkSampler fragmentImageSampler;
     VkRenderPass renderPass;
@@ -59,6 +61,7 @@ private:
     vktools::PipelineInfo blurXPipeline;
     vktools::PipelineInfo blurYPipeline;
     vktools::PipelineInfo updatePipeline;
+    vktools::PipelineInfo drawAgentsPipeline;
     raymarcher::core::Buffer agentsBuffer;
 
     VkCommandPool commandPool;
